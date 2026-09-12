@@ -17,8 +17,6 @@ ytdl_format_options = {
     'quiet': True,
     'cookiesfrombrowser': ('chrome',), # Tự động lấy cookie từ Chrome trên máy tính của bạn
 }
-    }
-}
 
 # Cấu hình ffmpeg cho Linux/Docker trên Render (không trỏ đường dẫn ổ C nữa)
 ffmpeg_options = {
