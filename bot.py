@@ -9,13 +9,24 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # Cấu hình yt-dlp và ffmpeg để stream trực tiếp không cần tải về máy
-ytdl_format_options = {
+tdl_options = {
     'format': 'bestaudio/best',
+    'extractaudio': True,
+    'audioformat': 'mp3',
+    'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
+    'restrictfilenames': True,
     'noplaylist': True,
-    'default_search': 'auto',
+    'nocheckcertificate': True,
+    'ignoreerrors': False,
+    'logtostderr': False,
     'quiet': True,
+    'no_warnings': True,
+    'default_search': 'auto',
+    'source_address': '0.0.0.0',
+    'cookiefile': 'cookies.txt'  # Thêm dòng này để yt-dlp nhận diện cookies
 }
 
+ytdl = yt_dlp.YoutubeDL(ytdl_options)
 ffmpeg_options = {
     'options': '-vn',
     'executable': r'C:\Users\ADMIN\OneDrive\Desktop\bot âm nhạc\ffmpeg.exe'
