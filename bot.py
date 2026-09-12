@@ -13,9 +13,8 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 ytdl_format_options = {
     'format': 'bestaudio/best',
     'noplaylist': True,
-    'default_search': 'ytsearch',
+    'default_search': 'scsearch', # Đổi từ tìm kiếm YouTube sang SoundCloud
     'quiet': True,
-    'cookiefile': 'cookies.txt',  # Trỏ đúng về file cookies.txt trong thư mục dự án
 }
 
 # Cấu hình ffmpeg cho Linux/Docker trên Render (không trỏ đường dẫn ổ C nữa)
