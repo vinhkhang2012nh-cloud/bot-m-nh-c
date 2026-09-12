@@ -15,7 +15,7 @@ ytdl_format_options = {
     'noplaylist': True,
     'default_search': 'auto',
     'quiet': True,
-    'cookiefile': 'cookies.txt',  # Thêm dòng này để nhận file cookies
+    'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
 }
 
 # Cấu hình ffmpeg cho Linux/Docker trên Render (không trỏ đường dẫn ổ C nữa)
