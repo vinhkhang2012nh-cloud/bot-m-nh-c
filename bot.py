@@ -153,4 +153,6 @@ async def stop(ctx):
 
 
 # Chạy bot bằng token của bạn (hoặc biến môi trường trên Render)
-bot.run('DISCORD_TOKEN')
+import os
+
+bot.run(os.getenv('DISCORD_TOKEN'))
