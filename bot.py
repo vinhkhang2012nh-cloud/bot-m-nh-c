@@ -75,5 +75,5 @@ async def stop(ctx):
         await ctx.voice_client.disconnect()
         await ctx.send("Đã dừng nhạc và ngắt kết nối!")
 
-# Chạy bot
-bot.run('MTUyOTgxNDM5MjAwOTM5NjI4NA.Gl66gt.BSjuWIMSo6pivFjBDbyNOG9KYkSo8fXr__PoPQ')
+import os
+bot.run(os.getenv("DISCORD_TOKEN"))
