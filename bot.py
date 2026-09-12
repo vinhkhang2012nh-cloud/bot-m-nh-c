@@ -153,4 +153,4 @@ async def stop(ctx):
 
 
 # Chạy bot bằng token của bạn (hoặc biến môi trường trên Render)
-bot.run('TOKEN_BOT_CUA_BAN')
+bot.run('DISCORD_TOKEN')
