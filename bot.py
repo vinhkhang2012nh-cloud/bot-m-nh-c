@@ -19,9 +19,9 @@ ytdl_format_options = {
 
 # Cấu hình ffmpeg cho Linux/Docker trên Render (không trỏ đường dẫn ổ C nữa)
 ffmpeg_options = {
-    'options': '-vn'
+    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+    'options': '-vn -bufsize 64k',
 }
-
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
 class YTDLSource(discord.PCMVolumeTransformer):
