@@ -13,12 +13,10 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 ytdl_format_options = {
     'format': 'bestaudio/best',
     'noplaylist': True,
-    'default_search': 'ytsearch', # Ép tìm kiếm qua cơ chế search chuẩn
+    'default_search': 'ytsearch',
     'quiet': True,
-    'extractor_args': {
-        'youtube': {
-            'player_client': ['mweb', 'android'] # Dùng client mobile để né captcha
-        }
+    'cookiesfrombrowser': ('chrome',), # Tự động lấy cookie từ Chrome trên máy tính của bạn
+}
     }
 }
 
