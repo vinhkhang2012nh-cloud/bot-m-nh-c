@@ -76,4 +76,4 @@ async def stop(ctx):
         await ctx.send("Đã dừng nhạc và ngắt kết nối!")
 
 # Chạy bot
-bot.run('MTUyOTgxNDM5MjAwOTM5NjI4NA.G8e0su.m9qD8hgXQo07VpWES9XjTl5QQUzpmedoUzr_hk')
+bot.run('MTUyOTgxNDM5MjAwOTM5NjI4NA.Gl66gt.BSjuWIMSo6pivFjBDbyNOG9KYkSo8fXr__PoPQ')
