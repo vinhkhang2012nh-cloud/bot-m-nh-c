@@ -2,34 +2,25 @@ import discord
 from discord.ext import commands
 import yt_dlp
 import asyncio
+import os
 
 # Cấu hình cơ bản
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Cấu hình yt-dlp và ffmpeg để stream trực tiếp không cần tải về máy
-tdl_options = {
+# Cấu hình yt-dlp (Đã thêm cookiefile để chống lỗi anti-bot của YouTube)
+ytdl_format_options = {
     'format': 'bestaudio/best',
-    'extractaudio': True,
-    'audioformat': 'mp3',
-    'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
-    'restrictfilenames': True,
     'noplaylist': True,
-    'nocheckcertificate': True,
-    'ignoreerrors': False,
-    'logtostderr': False,
-    'quiet': True,
-    'no_warnings': True,
     'default_search': 'auto',
-    'source_address': '0.0.0.0',
-    'cookiefile': 'cookies.txt'  # Thêm dòng này để yt-dlp nhận diện cookies
+    'quiet': True,
+    'cookiefile': 'cookies.txt',  # Thêm dòng này để nhận file cookies
 }
 
-ytdl = yt_dlp.YoutubeDL(ytdl_options)
+# Cấu hình ffmpeg cho Linux/Docker trên Render (không trỏ đường dẫn ổ C nữa)
 ffmpeg_options = {
-    'options': '-vn',
-    'executable': r'C:\Users\ADMIN\OneDrive\Desktop\bot âm nhạc\ffmpeg.exe'
+    'options': '-vn'
 }
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
@@ -86,5 +77,4 @@ async def stop(ctx):
         await ctx.voice_client.disconnect()
         await ctx.send("Đã dừng nhạc và ngắt kết nối!")
 
-import os
 bot.run(os.getenv("DISCORD_TOKEN"))
