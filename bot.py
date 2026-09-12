@@ -15,7 +15,7 @@ ytdl_format_options = {
     'noplaylist': True,
     'default_search': 'ytsearch',
     'quiet': True,
-    'cookiefile': 'cookies.txt', # Trỏ trực tiếp về file cookies.txt trong thư mục dự án
+    'cookiefile': 'cookies.txt',  # Trỏ đúng về file cookies.txt trong thư mục dự án
 }
 
 # Cấu hình ffmpeg cho Linux/Docker trên Render (không trỏ đường dẫn ổ C nữa)
