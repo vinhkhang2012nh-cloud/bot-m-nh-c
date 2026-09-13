@@ -239,44 +239,21 @@ async def lyrics(ctx, *, query: str = None):
     try:
       search_query = query
 
-      # Nếu là link YouTube/SoundCloud, thử dùng đủ mọi cách để bóc tên bài
-      if (
-          'youtube.com' in query
-          or 'youtu.be' in query
-          or 'soundcloud.com' in query
-      ):
-        extracted_title = None
-
-        # Cách 1: Dùng urllib cào thẻ og:title (nhanh, nhẹ)
+      # Nếu là link YouTube, dùng API Noembed để lấy tiêu đề sạch sẽ, không sợ bị YouTube quét bot
+      if 'youtube.com' in query or 'youtu.be' in query:
         try:
+          api_url = f'https://noembed.com/embed?url={query}'
           req = urllib.request.Request(
-              query, headers={'User-Agent': 'Mozilla/5.0'}
+              api_url, headers={'User-Agent': 'Mozilla/5.0'}
           )
-          with urllib.request.urlopen(req, timeout=4) as response:
-            html = response.read().decode('utf-8', errors='ignore')
-            match = re.search(
-                r'<meta property="og:title" content="(.*?)">', html
-            )
-            if match:
-              extracted_title = match.group(1)
-        except Exception:
-          pass
+          with urllib.request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read().decode())
+            if 'title' in data:
+              search_query = data['title']
+        except Exception as e:
+          print(f'Lỗi lấy tiêu đề qua API: {e}')
 
-        # Cách 2: Nếu cách 1 kẹt, bồi thêm yt_dlp như bản bạn vừa gửi
-        if not extracted_title:
-          try:
-            ydl_opts_title = {'quiet': True, 'extract_flat': True}
-            with yt_dlp.YoutubeDL(ydl_opts_title) as ydl_temp:
-              info_temp = ydl_temp.extract_info(query, download=False)
-              if info_temp and 'title' in info_temp:
-                extracted_title = info_temp['title']
-          except Exception:
-            pass
-
-        if extracted_title:
-          search_query = extracted_title
-
-      # Tìm kiếm lời bài hát qua API lrclib với từ khóa động
+      # Tìm kiếm lời bài hát qua API lrclib với từ khóa
       encoded_query = urllib.parse.quote(search_query)
       url = f'https://lrclib.net/api/search?q={encoded_query}'
       req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
