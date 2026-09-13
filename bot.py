@@ -50,6 +50,7 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 ytdl_format_options = {
     'format': 'bestaudio',
     'noplaylist': True,
+    'default_search': 'auto',
     'quiet': True,
 }
 
