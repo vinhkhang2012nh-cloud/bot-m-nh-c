@@ -239,7 +239,7 @@ async def lyrics(ctx, *, query: str = None):
     try:
       search_query = query
 
-      # Nếu là link YouTube, dùng API Noembed để lấy tiêu đề sạch sẽ, không sợ bị YouTube quét bot
+      # Nếu là link YouTube, dùng Noembed lấy tiêu đề
       if 'youtube.com' in query or 'youtu.be' in query:
         try:
           api_url = f'https://noembed.com/embed?url={query}'
@@ -249,11 +249,26 @@ async def lyrics(ctx, *, query: str = None):
           with urllib.request.urlopen(req, timeout=5) as response:
             data = json.loads(response.read().decode())
             if 'title' in data:
-              search_query = data['title']
+              raw_title = data['title']
+
+              # Dùng Regex lột sạch mấy từ thừa như [Official MV], (Audio), ft, ... cho sạch sẽ
+              cleaned_title = re.sub(
+                  r'(?i)\b(official\s*(music\s*)?video|official\s*audio|official\s*lyric\s*video|mv|audio|lyric(s)?|ft\.?|feat\.?|live)\b',
+                  '',
+                  raw_title,
+              )
+              # Xóa bỏ các cặp ngoặc vuông/tròn thừa còn sót lại sau khi cắt
+              cleaned_title = re.sub(r'[\(\[\{].*?[\)\]\}]', '', cleaned_title)
+              # Gom lại khoảng trắng cho gọn
+              search_query = ' '.join(cleaned_title.split())
+
+              # Nếu lỡ tay lọc quá đà mà trống trơn thì quay về dùng lại tên gốc của Noembed
+              if not search_query.strip():
+                search_query = raw_title
         except Exception as e:
           print(f'Lỗi lấy tiêu đề qua API: {e}')
 
-      # Tìm kiếm lời bài hát qua API lrclib với từ khóa
+      # Tìm kiếm lời bài hát qua API lrclib với từ khóa đã được gọt giũa sạch sẽ
       encoded_query = urllib.parse.quote(search_query)
       url = f'https://lrclib.net/api/search?q={encoded_query}'
       req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
