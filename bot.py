@@ -120,7 +120,7 @@ async def play(ctx, *, search: str):
     await channel.connect()
 
   async with ctx.typing():
-    # Trích xuất thông tin bài hát từ từ khóa tìm kiếm
+    # Trích xuất thông tin bài hát từ từ khóa tìm kiếm hoặc link
     loop = asyncio.get_event_loop()
     data = await loop.run_in_executor(
         None, lambda: ytdl.extract_info(search, download=False)
@@ -193,34 +193,58 @@ async def toggle_loop(ctx):
 
 @bot.command(name='loi')
 async def lyrics(ctx, *, query: str = None):
+  guild_id = ctx.guild.id
+
+  # 1. Nếu không nhập gì -> Lấy bài đang phát trong phòng
   if not query:
-    guild_id = ctx.guild.id
     if guild_id in current_songs:
       query = current_songs[guild_id]['title']
     else:
       await ctx.send(
-          '⚠️ Bot không phát bài nào và bạn cũng không nhập tên bài hát cần tìm!'
+          '⚠️ Bot không phát bài nào cả! Hãy gõ tên bài, tên ca sĩ hoặc dán link'
+          ' vào nhé (Ví dụ: `!loi https://...`)'
       )
       return
 
   async with ctx.typing():
     try:
-      encoded_query = urllib.parse.quote(query)
+      search_query = query
+      # 2. Nếu người dùng dán link vào -> Dùng yt-dlp trích xuất tiêu đề gốc của link đó luôn
+      if query.startswith('http://') or query.startswith('https://'):
+        loop = asyncio.get_event_loop()
+        data = await loop.run_in_executor(
+            None, lambda: ytdl.extract_info(query, download=False)
+        )
+        if 'entries' in data:
+          data = data['entries'][0]
+        search_query = data.get('title', query)
+
+      # 3. Tiến hành gọi API tìm kiếm lời bài hát
+      encoded_query = urllib.parse.quote(search_query)
       url = f'https://lrclib.net/api/search?q={encoded_query}'
       req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
       with urllib.request.urlopen(req) as response:
-        data = json.loads(response.read().decode())
+        result_data = json.loads(response.read().decode())
 
-      if not data:
-        await ctx.send(f'❌ Không tìm thấy lời cho bài: **{query}**')
+      if not result_data:
+        await ctx.send(
+            f'❌ Không tìm thấy lời cho: **{search_query}** (Gốc: {query})'
+        )
         return
 
-      track = data[0]
+      track = None
+      for item in result_data:
+        if item.get('plainLyrics'):
+          track = item
+          break
+
+      if not track:
+        track = result_data[0]
+
       lyric_text = track.get('plainLyrics') or 'Không có sẵn lời cho bài này.'
-      title = track.get('trackName', query)
+      title = track.get('trackName', search_query)
       artist = track.get('artistName', 'Unknown')
 
-      # Giới hạn kí tự của Discord Embed (tối đa 4000 kí tự mô tả)
       if len(lyric_text) > 4000:
         lyric_text = lyric_text[:4000] + '\n...(Lời quá dài bị cắt bớt)'
 
