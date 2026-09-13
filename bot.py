@@ -239,20 +239,42 @@ async def lyrics(ctx, *, query: str = None):
     try:
       search_query = query
 
-      # Nếu là link YouTube, cố gắng trích xuất tiêu đề thực tế của link đó
-      if 'youtube.com' in query or 'youtu.be' in query:
+      # Nếu là link YouTube/SoundCloud, thử dùng đủ mọi cách để bóc tên bài
+      if (
+          'youtube.com' in query
+          or 'youtu.be' in query
+          or 'soundcloud.com' in query
+      ):
+        extracted_title = None
+
+        # Cách 1: Dùng urllib cào thẻ og:title (nhanh, nhẹ)
         try:
-          ydl_opts_title = {'quiet': True, 'extract_flat': True}
-          with yt_dlp.YoutubeDL(ydl_opts_title) as ydl_temp:
-            info_temp = ydl_temp.extract_info(query, download=False)
-            if info_temp and 'title' in info_temp:
-              search_query = info_temp['title']
-        except:
+          req = urllib.request.Request(
+              query, headers={'User-Agent': 'Mozilla/5.0'}
+          )
+          with urllib.request.urlopen(req, timeout=4) as response:
+            html = response.read().decode('utf-8', errors='ignore')
+            match = re.search(
+                r'<meta property="og:title" content="(.*?)">', html
+            )
+            if match:
+              extracted_title = match.group(1)
+        except Exception:
           pass
 
-        # Nếu vẫn không quét được tiêu đề từ link, giữ nguyên query gốc (hoặc link) để tìm kiếm linh hoạt thay vì ép buộc một bài cố định
-        if 'youtube.com' in search_query or 'youtu.be' in search_query:
-          search_query = query
+        # Cách 2: Nếu cách 1 kẹt, bồi thêm yt_dlp như bản bạn vừa gửi
+        if not extracted_title:
+          try:
+            ydl_opts_title = {'quiet': True, 'extract_flat': True}
+            with yt_dlp.YoutubeDL(ydl_opts_title) as ydl_temp:
+              info_temp = ydl_temp.extract_info(query, download=False)
+              if info_temp and 'title' in info_temp:
+                extracted_title = info_temp['title']
+          except Exception:
+            pass
+
+        if extracted_title:
+          search_query = extracted_title
 
       # Tìm kiếm lời bài hát qua API lrclib với từ khóa động
       encoded_query = urllib.parse.quote(search_query)
@@ -291,7 +313,6 @@ async def lyrics(ctx, *, query: str = None):
       await ctx.send(embed=embed)
     except Exception as e:
       await ctx.send(f'⚠️ Có lỗi xảy ra khi lấy lời bài hát: {e}')
-
 
 @bot.command(name='dung')
 async def stop(ctx):
