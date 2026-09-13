@@ -53,6 +53,11 @@ ytdl_format_options = {
     'default_search': 'scsearch',
     'quiet': True,
     'extract_flat': False,
+    'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '192',
+    }],
 }
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
@@ -60,9 +65,8 @@ ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 ffmpeg_options = {
     'before_options': (
         '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
-        ' -reconnect_streamed 1'
     ),
-    'options': '-vn -ar 48000 -ac 2 -b:a 192k',
+    'options': '-vn',
 }
 # ==========================================
 # 4. QUẢN LÝ HÀNG ĐỢI VÀ TRẠNG THÁI NHẠC
