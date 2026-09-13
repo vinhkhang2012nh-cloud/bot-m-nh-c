@@ -37,11 +37,10 @@ intents.voice_states = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Cấu hình yt-dlp dùng scsearch (SoundCloud) để phát nhạc an toàn tuyệt đối
+# Cấu hình yt-dlp tổng quát hỗ trợ cả YouTube lẫn SoundCloud
 ytdl_format_options = {
     'format': 'bestaudio/best',
     'noplaylist': True,
-    'default_search': 'scsearch',
     'quiet': True,
     'extract_flat': False,
 }
@@ -109,22 +108,22 @@ async def play(ctx, *, search: str):
     await ctx.send('⚠️ Bạn phải vào một phòng Voice trước đã nhé!')
     return
 
-  if 'youtube.com' in search or 'youtu.be' in search:
-    await ctx.send(
-        '⚠️ Do YouTube chặn link trực tiếp, bạn hãy gõ tên bài hát/ca sĩ thay'
-        ' vì dán link nhé (Ví dụ: `!phat Madihu Co em`)!'
-    )
-    return
-
   channel = ctx.author.voice.channel
   if not ctx.voice_client:
     await channel.connect()
 
   async with ctx.typing():
+    # Nếu không phải link thì dùng scsearch để tìm kiếm trên SoundCloud cho an toàn
+    query = (
+        search
+        if ('youtube.com' in search or 'youtu.be' in search)
+        else f'scsearch:{search}'
+    )
+
     loop = asyncio.get_event_loop()
     try:
       data = await loop.run_in_executor(
-          None, lambda: ytdl.extract_info(search, download=False)
+          None, lambda: ytdl.extract_info(query, download=False)
       )
     except Exception as e:
       await ctx.send(f'⚠️ Không thể tìm thấy bài hát: {e}')
@@ -137,7 +136,7 @@ async def play(ctx, *, search: str):
     if 'entries' in data:
       data = data['entries'][0]
 
-    song = {'title': data['title'], 'url': data['url']}
+    song = {'title': data.get('title', 'Unknown Title'), 'url': data['url']}
     guild_id = ctx.guild.id
 
     if ctx.voice_client.is_playing():
@@ -207,21 +206,36 @@ async def lyrics(ctx, *, query: str = None):
       query = current_songs[guild_id]['title']
     else:
       await ctx.send(
-          '⚠️ Bot không phát bài nào cả! Hãy gõ tên bài kèm theo lệnh nhé (Ví'
-          ' dụ: `!loi Madihu Co em`)'
+          '⚠️ Bot không phát bài nào cả! Hãy gõ tên bài hoặc dán link YouTube'
+          ' kèm theo lệnh (Ví dụ: `!loi Madihu Co em`)'
       )
       return
 
   async with ctx.typing():
     try:
-      encoded_query = urllib.parse.quote(query)
+      search_query = query
+
+      # Nếu dán link YouTube vào lệnh !loi, tự động lấy tiêu đề video để tìm lời chính xác
+      if 'youtube.com' in query or 'youtu.be' in query:
+        try:
+          ydl_opts_title = {'quiet': True, 'extract_flat': True}
+          with yt_dlp.YoutubeDL(ydl_opts_title) as ydl_temp:
+            info_temp = ydl_temp.extract_info(query, download=False)
+            if info_temp and 'title' in info_temp:
+              search_query = info_temp['title']
+        except:
+          pass
+
+      encoded_query = urllib.parse.quote(search_query)
       url = f'https://lrclib.net/api/search?q={encoded_query}'
       req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
       with urllib.request.urlopen(req) as response:
         result_data = json.loads(response.read().decode())
 
       if not result_data:
-        await ctx.send(f'❌ Không tìm thấy lời cho: **{query}**')
+        await ctx.send(
+            f'❌ Không tìm thấy lời cho từ khóa: **{search_query}**'
+        )
         return
 
       track = None
@@ -234,7 +248,7 @@ async def lyrics(ctx, *, query: str = None):
         track = result_data[0]
 
       lyric_text = track.get('plainLyrics') or 'Không có sẵn lời cho bài này.'
-      title = track.get('trackName', query)
+      title = track.get('trackName', search_query)
       artist = track.get('artistName', 'Unknown')
 
       if len(lyric_text) > 4000:
