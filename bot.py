@@ -239,7 +239,7 @@ async def lyrics(ctx, *, query: str = None):
     try:
       search_query = query
 
-      # Dùng phương pháp quét HTML trực tiếp để lấy tiêu đề từ link YouTube/SoundCloud cực nhạy
+      # Dùng cách bắt thẻ og:title của YouTube/SoundCloud như bản đầu tiên
       if (
           'youtube.com' in query
           or 'youtu.be' in query
@@ -247,27 +247,17 @@ async def lyrics(ctx, *, query: str = None):
       ):
         try:
           req = urllib.request.Request(
-              query,
-              headers={
-                  'User-Agent': (
-                      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                      ' (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                  )
-              },
+              query, headers={'User-Agent': 'Mozilla/5.0'}
           )
           with urllib.request.urlopen(req, timeout=5) as response:
             html = response.read().decode('utf-8', errors='ignore')
-            match = re.search(r'<title>(.*?)</title>', html)
+            match = re.search(
+                r'<meta property="og:title" content="(.*?)">', html
+            )
             if match:
-              raw_title = match.group(1)
-              # Dọn dẹp các chữ thừa ở đuôi tiêu đề
-              raw_title = re.sub(r'\s*-\s*YouTube$', '', raw_title)
-              raw_title = re.sub(
-                  r'\s*\|\s*Free Listening on SoundCloud$', '', raw_title
-              )
-              search_query = raw_title.strip()
+              search_query = match.group(1)
         except Exception as e:
-          print(f'Lỗi quét tiêu đề link: {e}')
+          print(f'Lỗi đọc tiêu đề link: {e}')
 
       encoded_query = urllib.parse.quote(search_query)
       url = f'https://lrclib.net/api/search?q={encoded_query}'
