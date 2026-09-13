@@ -9,7 +9,9 @@ import discord
 from discord.ext import commands
 import yt_dlp
 
-# --- WEB SERVER MINI ĐỂ CHỐNG RENDER NGỦ (SPIN DOWN) ---
+# ==========================================
+# 1. WEB SERVER MINI CHỐNG RENDER NGỦ (SPIN DOWN)
+# ==========================================
 
 
 class MyHandler(http.server.SimpleHTTPRequestHandler):
@@ -30,17 +32,24 @@ t = threading.Thread(target=run_web)
 t.daemon = True
 t.start()
 
-# Cấu hình Intents cho Bot
+# ==========================================
+# 2. CẤU HÌNH BOT VÀ INTENTS
+# ==========================================
+
 intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Cấu hình yt-dlp tổng quát hỗ trợ cả YouTube lẫn SoundCloud
+# ==========================================
+# 3. CẤU HÌNH YT-DLP VÀ FFMPEG (DÙNG SEARCH AN TOÀN)
+# ==========================================
+
 ytdl_format_options = {
     'format': 'bestaudio/best',
     'noplaylist': True,
+    'default_search': 'scsearch',
     'quiet': True,
     'extract_flat': False,
 }
@@ -53,6 +62,10 @@ ffmpeg_options = {
     ),
     'options': '-vn -bufsize 64k',
 }
+
+# ==========================================
+# 4. QUẢN LÝ HÀNG ĐỢI VÀ TRẠNG THÁI NHẠC
+# ==========================================
 
 music_queues = {}
 music_loops = {}
@@ -97,9 +110,19 @@ async def discon(ctx):
     await ctx.voice_client.disconnect()
 
 
+# ==========================================
+# 5. SỰ KIỆN KHI BOT SẴN SÀNG
+# ==========================================
+
+
 @bot.event
 async def on_ready():
   print(f'Bot đã đăng nhập thành công dưới tên {bot.user}')
+
+
+# ==========================================
+# 6. CÁC LỆNH PHÁT NHẠC VÀ QUẢN LÝ
+# ==========================================
 
 
 @bot.command(name='phat')
@@ -108,22 +131,23 @@ async def play(ctx, *, search: str):
     await ctx.send('⚠️ Bạn phải vào một phòng Voice trước đã nhé!')
     return
 
+  # Chặn link YouTube trực tiếp để tránh lỗi "Sign in as a bot" của Render
+  if 'youtube.com' in search or 'youtu.be' in search:
+    await ctx.send(
+        '⚠️ Do YouTube chặn link trực tiếp trên server, bạn hãy gõ **tên bài'
+        ' hát** thay vì dán link nhé (Ví dụ: `!phat Madihu Co em`)!'
+    )
+    return
+
   channel = ctx.author.voice.channel
   if not ctx.voice_client:
     await channel.connect()
 
   async with ctx.typing():
-    # Nếu không phải link thì dùng scsearch để tìm kiếm trên SoundCloud cho an toàn
-    query = (
-        search
-        if ('youtube.com' in search or 'youtu.be' in search)
-        else f'scsearch:{search}'
-    )
-
     loop = asyncio.get_event_loop()
     try:
       data = await loop.run_in_executor(
-          None, lambda: ytdl.extract_info(query, download=False)
+          None, lambda: ytdl.extract_info(search, download=False)
       )
     except Exception as e:
       await ctx.send(f'⚠️ Không thể tìm thấy bài hát: {e}')
@@ -136,7 +160,7 @@ async def play(ctx, *, search: str):
     if 'entries' in data:
       data = data['entries'][0]
 
-    song = {'title': data.get('title', 'Unknown Title'), 'url': data['url']}
+    song = {'title': data.get('title', search), 'url': data['url']}
     guild_id = ctx.guild.id
 
     if ctx.voice_client.is_playing():
@@ -169,7 +193,7 @@ async def skip(ctx):
 
 
 @bot.command(name='list')
-async def show_queue(ctx):
+async def show_query(ctx):
   guild_id = ctx.guild.id
   if guild_id not in music_queues or len(music_queues[guild_id]) == 0:
     await ctx.send('📭 Hàng đợi hiện đang trống!')
@@ -201,41 +225,35 @@ async def toggle_loop(ctx):
 async def lyrics(ctx, *, query: str = None):
   guild_id = ctx.guild.id
 
+  # Nếu không nhập gì, lấy tên bài đang phát
   if not query:
     if guild_id in current_songs:
       query = current_songs[guild_id]['title']
     else:
       await ctx.send(
-          '⚠️ Bot không phát bài nào cả! Hãy gõ tên bài hoặc dán link YouTube'
-          ' kèm theo lệnh (Ví dụ: `!loi Madihu Co em`)'
+          '⚠️ Bot không phát bài nào cả! Hãy gõ tên bài kèm theo lệnh nhé (Ví'
+          ' dụ: `!loi Madihu Co em`)'
       )
       return
 
+  # Nếu người dùng dán link YouTube vào !loi, báo nhắc gõ tên thay vì cố cào link gây lỗi
+  if 'youtube.com' in query or 'youtu.be' in query:
+    await ctx.send(
+        '⚠️ Không thể đọc trực tiếp link YouTube. Bạn hãy gõ **tên bài hát**'
+        ' để lấy lời nhé (Ví dụ: `!loi Madihu Co em`)!'
+    )
+    return
+
   async with ctx.typing():
     try:
-      search_query = query
-
-      # Nếu dán link YouTube vào lệnh !loi, tự động lấy tiêu đề video để tìm lời chính xác
-      if 'youtube.com' in query or 'youtu.be' in query:
-        try:
-          ydl_opts_title = {'quiet': True, 'extract_flat': True}
-          with yt_dlp.YoutubeDL(ydl_opts_title) as ydl_temp:
-            info_temp = ydl_temp.extract_info(query, download=False)
-            if info_temp and 'title' in info_temp:
-              search_query = info_temp['title']
-        except:
-          pass
-
-      encoded_query = urllib.parse.quote(search_query)
+      encoded_query = urllib.parse.quote(query)
       url = f'https://lrclib.net/api/search?q={encoded_query}'
       req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
       with urllib.request.urlopen(req) as response:
         result_data = json.loads(response.read().decode())
 
       if not result_data:
-        await ctx.send(
-            f'❌ Không tìm thấy lời cho từ khóa: **{search_query}**'
-        )
+        await ctx.send(f'❌ Không tìm thấy lời cho từ khóa: **{query}**')
         return
 
       track = None
@@ -248,7 +266,7 @@ async def lyrics(ctx, *, query: str = None):
         track = result_data[0]
 
       lyric_text = track.get('plainLyrics') or 'Không có sẵn lời cho bài này.'
-      title = track.get('trackName', search_query)
+      title = track.get('trackName', query)
       artist = track.get('artistName', 'Unknown')
 
       if len(lyric_text) > 4000:
@@ -278,9 +296,15 @@ async def stop(ctx):
     )
 
 
+# ==========================================
+# 7. KHỞI CHẠY BOT VỚI TOKEN TỪ RENDER
+# ==========================================
+
 token = os.getenv('DISCORD_TOKEN')
 
 if not token:
-  print('⚠️ LỖI CHƯA CÓ TOKEN: Hãy cấu hình DISCORD_TOKEN trên Render!')
+  print(
+      '⚠️ LỖI CHƯA CÓ TOKEN: Hãy cấu hình biến DISCORD_TOKEN trên Render nhé!'
+  )
 else:
   bot.run(token)
