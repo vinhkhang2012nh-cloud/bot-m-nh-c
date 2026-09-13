@@ -26,11 +26,9 @@ def run_web():
   httpd.serve_forever()
 
 
-# Chạy web server ở một luồng riêng biệt
 t = threading.Thread(target=run_web)
 t.daemon = True
 t.start()
-# -----------------------------------------------------
 
 # Cấu hình Intents cho Bot
 intents = discord.Intents.default()
@@ -50,7 +48,6 @@ ytdl_format_options = {
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
-# Cấu hình FFmpeg để chống giật mạng
 ffmpeg_options = {
     'before_options': (
         '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
@@ -58,7 +55,6 @@ ffmpeg_options = {
     'options': '-vn -bufsize 64k',
 }
 
-# Quản lý hàng đợi, trạng thái lặp và bài hát hiện tại cho từng server
 music_queues = {}
 music_loops = {}
 current_songs = {}
@@ -113,37 +109,29 @@ async def play(ctx, *, search: str):
     await ctx.send('⚠️ Bạn phải vào một phòng Voice trước đã nhé!')
     return
 
+  if 'youtube.com' in search or 'youtu.be' in search:
+    await ctx.send(
+        '⚠️ Do YouTube chặn link trực tiếp, bạn hãy gõ tên bài hát/ca sĩ thay'
+        ' vì dán link nhé (Ví dụ: `!phat Madihu Co em`)!'
+    )
+    return
+
   channel = ctx.author.voice.channel
   if not ctx.voice_client:
     await channel.connect()
 
   async with ctx.typing():
-    search_query = search
-
-    # Tự động trích xuất tiêu đề nếu người dùng dán link YouTube vào lệnh !phat
-    if 'youtube.com' in search or 'youtu.be' in search:
-      try:
-        ydl_opts_title = {'quiet': True, 'extract_flat': True}
-        with yt_dlp.YoutubeDL(ydl_opts_title) as ydl_temp:
-          info_temp = ydl_temp.extract_info(search, download=False)
-          if info_temp and 'title' in info_temp:
-            search_query = info_temp['title']
-      except:
-        pass
-
     loop = asyncio.get_event_loop()
     try:
       data = await loop.run_in_executor(
-          None, lambda: ytdl.extract_info(search_query, download=False)
+          None, lambda: ytdl.extract_info(search, download=False)
       )
     except Exception as e:
-      await ctx.send(
-          f'⚠️ Không thể tìm thấy bài hát **"{search}"**: {e}'
-      )
+      await ctx.send(f'⚠️ Không thể tìm thấy bài hát: {e}')
       return
 
     if not data:
-      await ctx.send(f'❌ Không tìm thấy kết quả nào cho: **{search}**')
+      await ctx.send('❌ Không tìm thấy kết quả nào phù hợp!')
       return
 
     if 'entries' in data:
@@ -219,38 +207,21 @@ async def lyrics(ctx, *, query: str = None):
       query = current_songs[guild_id]['title']
     else:
       await ctx.send(
-          '⚠️ Bot không phát bài nào cả! Hãy gõ tên bài, tên ca sĩ hoặc từ khóa'
-          ' nhé (Ví dụ: `!loi Sơn Tùng`)'
+          '⚠️ Bot không phát bài nào cả! Hãy gõ tên bài kèm theo lệnh nhé (Ví'
+          ' dụ: `!loi Madihu Co em`)'
       )
       return
 
   async with ctx.typing():
     try:
-      search_query = query
-
-      if 'youtube.com' in query or 'youtu.be' in query:
-        try:
-          ydl_opts_title = {'quiet': True, 'extract_flat': True}
-          with yt_dlp.YoutubeDL(ydl_opts_title) as ydl_temp:
-            info_temp = ydl_temp.extract_info(query, download=False)
-            if info_temp and 'title' in info_temp:
-              search_query = info_temp['title']
-        except:
-          pass
-
-        if 'youtube.com' in search_query or 'youtu.be' in search_query:
-          search_query = query
-
-      encoded_query = urllib.parse.quote(search_query)
+      encoded_query = urllib.parse.quote(query)
       url = f'https://lrclib.net/api/search?q={encoded_query}'
       req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
       with urllib.request.urlopen(req) as response:
         result_data = json.loads(response.read().decode())
 
       if not result_data:
-        await ctx.send(
-            f'❌ Không tìm thấy lời cho từ khóa: **{search_query}**'
-        )
+        await ctx.send(f'❌ Không tìm thấy lời cho: **{query}**')
         return
 
       track = None
@@ -263,7 +234,7 @@ async def lyrics(ctx, *, query: str = None):
         track = result_data[0]
 
       lyric_text = track.get('plainLyrics') or 'Không có sẵn lời cho bài này.'
-      title = track.get('trackName', search_query)
+      title = track.get('trackName', query)
       artist = track.get('artistName', 'Unknown')
 
       if len(lyric_text) > 4000:
@@ -293,13 +264,9 @@ async def stop(ctx):
     )
 
 
-# Lấy token từ biến môi trường trên Render
 token = os.getenv('DISCORD_TOKEN')
 
 if not token:
-  print(
-      '⚠️ LỖI CHƯA CÓ TOKEN: Bạn hãy tạo biến DISCORD_TOKEN trong phần'
-      ' Environment của Render nhé!'
-  )
+  print('⚠️ LỖI CHƯA CÓ TOKEN: Hãy cấu hình DISCORD_TOKEN trên Render!')
 else:
   bot.run(token)
