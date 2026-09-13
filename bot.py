@@ -39,12 +39,13 @@ intents.voice_states = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Cấu hình yt-dlp (dùng scsearch để tối ưu, không sợ bị chặn)
+# Chuyển hoàn toàn default_search sang 'scsearch' (SoundCloud) để tránh bị YouTube chặn bot
 ytdl_format_options = {
     'format': 'bestaudio/best',
     'noplaylist': True,
     'default_search': 'scsearch',
     'quiet': True,
+    'extract_flat': False,
 }
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
@@ -120,11 +121,15 @@ async def play(ctx, *, search: str):
     await channel.connect()
 
   async with ctx.typing():
-    # Trích xuất thông tin bài hát từ từ khóa tìm kiếm hoặc link
     loop = asyncio.get_event_loop()
-    data = await loop.run_in_executor(
-        None, lambda: ytdl.extract_info(search, download=False)
-    )
+    try:
+      data = await loop.run_in_executor(
+          None, lambda: ytdl.extract_info(search, download=False)
+      )
+    except Exception as e:
+      await ctx.send(f'⚠️ Không thể tải bài hát này: {e}')
+      return
+
     if 'entries' in data:
       data = data['entries'][0]
 
@@ -156,7 +161,7 @@ async def play(ctx, *, search: str):
 @bot.command(name='skip')
 async def skip(ctx):
   if ctx.voice_client and ctx.voice_client.is_playing():
-    ctx.voice_client.stop()  # Dừng bài hiện tại, hàm after tự động gọi bài tiếp
+    ctx.voice_client.stop()
     await ctx.send('⏭️ Đã bỏ qua bài hiện tại!')
   else:
     await ctx.send('⚠️ Bot hiện không phát bài nào cả.')
@@ -195,21 +200,20 @@ async def toggle_loop(ctx):
 async def lyrics(ctx, *, query: str = None):
   guild_id = ctx.guild.id
 
-  # 1. Nếu không nhập gì -> Lấy bài đang phát trong phòng
   if not query:
     if guild_id in current_songs:
       query = current_songs[guild_id]['title']
     else:
       await ctx.send(
           '⚠️ Bot không phát bài nào cả! Hãy gõ tên bài, tên ca sĩ hoặc dán link'
-          ' vào nhé (Ví dụ: `!loi https://...`)'
+          ' vào nhé (Ví dụ: `!loi Em của ngày hôm qua`)'
       )
       return
 
   async with ctx.typing():
     try:
       search_query = query
-      # 2. Nếu người dùng dán link vào -> Dùng yt-dlp trích xuất tiêu đề gốc của link đó luôn
+      # Nếu người dùng dán link vào
       if query.startswith('http://') or query.startswith('https://'):
         loop = asyncio.get_event_loop()
         data = await loop.run_in_executor(
@@ -219,7 +223,7 @@ async def lyrics(ctx, *, query: str = None):
           data = data['entries'][0]
         search_query = data.get('title', query)
 
-      # 3. Tiến hành gọi API tìm kiếm lời bài hát
+      # Tìm kiếm lời bài hát qua API lrclib
       encoded_query = urllib.parse.quote(search_query)
       url = f'https://lrclib.net/api/search?q={encoded_query}'
       req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -227,9 +231,7 @@ async def lyrics(ctx, *, query: str = None):
         result_data = json.loads(response.read().decode())
 
       if not result_data:
-        await ctx.send(
-            f'❌ Không tìm thấy lời cho: **{search_query}** (Gốc: {query})'
-        )
+        await ctx.send(f'❌ Không tìm thấy lời cho: **{search_query}**')
         return
 
       track = None
