@@ -61,10 +61,7 @@ ffmpeg_options = {
     'before_options': (
         '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
     ),
-    'options': (
-        '-vn -filter:a "scaletempo=scale=icaburt,aresample=48000"'
-        ' -ar 48000 -ac 2'
-    ),
+    'options': '-vn -filter:a "aresample=48000" -ar 48000 -ac 2',
 }
 
 # ==========================================
