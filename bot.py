@@ -230,8 +230,8 @@ async def lyrics(ctx, *, query: str = None):
       query = current_songs[guild_id]['title']
     else:
       await ctx.send(
-          '⚠️ Bot không phát bài nào cả! Hãy gõ tên bài hoặc dán link kèm theo'
-          ' lệnh nhé.'
+          '⚠️ Bot không phát bài nào cả! Hãy gõ tên bài, tên ca sĩ hoặc từ khóa'
+          ' nhé (Ví dụ: `!loi Sơn Tùng`)'
       )
       return
 
@@ -239,26 +239,22 @@ async def lyrics(ctx, *, query: str = None):
     try:
       search_query = query
 
-      # Dùng cách bắt thẻ og:title của YouTube/SoundCloud như bản đầu tiên
-      if (
-          'youtube.com' in query
-          or 'youtu.be' in query
-          or 'soundcloud.com' in query
-      ):
+      # Nếu là link YouTube, cố gắng trích xuất tiêu đề thực tế của link đó
+      if 'youtube.com' in query or 'youtu.be' in query:
         try:
-          req = urllib.request.Request(
-              query, headers={'User-Agent': 'Mozilla/5.0'}
-          )
-          with urllib.request.urlopen(req, timeout=5) as response:
-            html = response.read().decode('utf-8', errors='ignore')
-            match = re.search(
-                r'<meta property="og:title" content="(.*?)">', html
-            )
-            if match:
-              search_query = match.group(1)
-        except Exception as e:
-          print(f'Lỗi đọc tiêu đề link: {e}')
+          ydl_opts_title = {'quiet': True, 'extract_flat': True}
+          with yt_dlp.YoutubeDL(ydl_opts_title) as ydl_temp:
+            info_temp = ydl_temp.extract_info(query, download=False)
+            if info_temp and 'title' in info_temp:
+              search_query = info_temp['title']
+        except:
+          pass
 
+        # Nếu vẫn không quét được tiêu đề từ link, giữ nguyên query gốc (hoặc link) để tìm kiếm linh hoạt thay vì ép buộc một bài cố định
+        if 'youtube.com' in search_query or 'youtu.be' in search_query:
+          search_query = query
+
+      # Tìm kiếm lời bài hát qua API lrclib với từ khóa động
       encoded_query = urllib.parse.quote(search_query)
       url = f'https://lrclib.net/api/search?q={encoded_query}'
       req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
