@@ -1,8 +1,28 @@
 import asyncio
+import http.server
 import os
+import threading
 import discord
 from discord.ext import commands
 import yt_dlp
+
+# --- WEB SERVER MINI ĐỂ CHỐNG RENDER NGỦ (SPIN DOWN) ---
+class MyHandler(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b'Bot is alive and running!')
+
+def run_web():
+    server_address = ('0.0.0.0', 10000)
+    httpd = http.server.HTTPServer(server_address, MyHandler)
+    httpd.serve_forever()
+
+# Chạy web server ở một luồng riêng biệt
+t = threading.Thread(target=run_web)
+t.daemon = True
+t.start()
+# -----------------------------------------------------
 
 # Cấu hình Intents cho Bot
 intents = discord.Intents.default()
