@@ -118,20 +118,32 @@ async def play(ctx, *, search: str):
     await channel.connect()
 
   async with ctx.typing():
+    search_query = search
+
+    # Tự động trích xuất tiêu đề nếu người dùng dán link YouTube vào lệnh !phat
+    if 'youtube.com' in search or 'youtu.be' in search:
+      try:
+        ydl_opts_title = {'quiet': True, 'extract_flat': True}
+        with yt_dlp.YoutubeDL(ydl_opts_title) as ydl_temp:
+          info_temp = ydl_temp.extract_info(search, download=False)
+          if info_temp and 'title' in info_temp:
+            search_query = info_temp['title']
+      except:
+        pass
+
     loop = asyncio.get_event_loop()
     try:
-      if 'youtube.com' in search or 'youtu.be' in search:
-        search = 'scsearch:' + search
-
       data = await loop.run_in_executor(
-          None, lambda: ytdl.extract_info(search, download=False)
+          None, lambda: ytdl.extract_info(search_query, download=False)
       )
     except Exception as e:
       await ctx.send(
-          '⚠️ Không thể phát bài này. Bạn hãy gõ tên bài hát trực tiếp nhé (Ví'
-          ' dụ: `!phat Madihu Có em`): '
-          + str(e)
+          f'⚠️ Không thể tìm thấy bài hát **"{search}"**: {e}'
       )
+      return
+
+    if not data:
+      await ctx.send(f'❌ Không tìm thấy kết quả nào cho: **{search}**')
       return
 
     if 'entries' in data:
@@ -208,7 +220,7 @@ async def lyrics(ctx, *, query: str = None):
     else:
       await ctx.send(
           '⚠️ Bot không phát bài nào cả! Hãy gõ tên bài, tên ca sĩ hoặc từ khóa'
-          ' nhé (Ví dụ: `!loi Madihu Có em`)'
+          ' nhé (Ví dụ: `!loi Sơn Tùng`)'
       )
       return
 
@@ -216,10 +228,8 @@ async def lyrics(ctx, *, query: str = None):
     try:
       search_query = query
 
-      # Nếu người dùng dán link YouTube vào lệnh !loi, ta bóc tách trực tiếp tiêu đề từ trang web YouTube mà không sợ bị chặn bot API
       if 'youtube.com' in query or 'youtu.be' in query:
         try:
-          # Thử dùng yt-dlp trích xuất tiêu đề cơ bản bằng cách giả lập client web
           ydl_opts_title = {'quiet': True, 'extract_flat': True}
           with yt_dlp.YoutubeDL(ydl_opts_title) as ydl_temp:
             info_temp = ydl_temp.extract_info(query, download=False)
@@ -228,11 +238,9 @@ async def lyrics(ctx, *, query: str = None):
         except:
           pass
 
-        # Nếu vẫn không lấy được tiêu đề, ta lấy luôn chính câu lệnh hoặc nhắc người dùng gõ tên
         if 'youtube.com' in search_query or 'youtu.be' in search_query:
-          search_query = 'Madihu Có em'  # Fallback thông minh nếu không quét được
+          search_query = query
 
-      # Tìm kiếm lời bài hát chính xác qua API lrclib
       encoded_query = urllib.parse.quote(search_query)
       url = f'https://lrclib.net/api/search?q={encoded_query}'
       req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -240,7 +248,9 @@ async def lyrics(ctx, *, query: str = None):
         result_data = json.loads(response.read().decode())
 
       if not result_data:
-        await ctx.send(f'❌ Không tìm thấy lời cho: **{search_query}**')
+        await ctx.send(
+            f'❌ Không tìm thấy lời cho từ khóa: **{search_query}**'
+        )
         return
 
       track = None
