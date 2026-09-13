@@ -60,10 +60,10 @@ ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 ffmpeg_options = {
     'before_options': (
         '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
+        ' -reconnect_streamed 1'
     ),
-    'options': '-vn -filter:a "aresample=48000" -ar 48000 -ac 2',
+    'options': '-vn -ar 48000 -ac 2 -b:a 192k',
 }
-
 # ==========================================
 # 4. QUẢN LÝ HÀNG ĐỢI VÀ TRẠNG THÁI NHẠC
 # ==========================================
