@@ -2,7 +2,6 @@ import asyncio
 import http.server
 import json
 import os
-import re
 import threading
 import urllib.parse
 import urllib.request
@@ -239,33 +238,20 @@ async def lyrics(ctx, *, query: str = None):
     try:
       search_query = query
 
-      # Hỗ trợ đọc cả link YouTube lẫn SoundCloud cho lệnh !loi siêu mượt
+      # Dùng yt_dlp lấy tiêu đề video/link cực kỳ chuẩn xác cho lệnh lấy lời
       if (
           'youtube.com' in query
           or 'youtu.be' in query
           or 'soundcloud.com' in query
       ):
         try:
-          req = urllib.request.Request(
-              query,
-              headers={
-                  'User-Agent': (
-                      'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-                  )
-              },
-          )
-          with urllib.request.urlopen(req, timeout=5) as response:
-            html = response.read().decode('utf-8', errors='ignore')
-            match = re.search(r'<title>(.*?)</title>', html)
-            if match:
-              raw_title = match.group(1)
-              raw_title = re.sub(r'\s*-\s*YouTube$', '', raw_title)
-              raw_title = re.sub(
-                  r'\s*\|\s*Free Listening on SoundCloud$', '', raw_title
-              )
-              search_query = raw_title
+          ydl_opts_title = {'quiet': True, 'extract_flat': True}
+          with yt_dlp.YoutubeDL(ydl_opts_title) as ydl_temp:
+            info_temp = ydl_temp.extract_info(query, download=False)
+            if info_temp and 'title' in info_temp:
+              search_query = info_temp['title']
         except Exception as e:
-          print(f'Lỗi đọc title link: {e}')
+          print(f'Lỗi lấy tiêu đề link: {e}')
 
       encoded_query = urllib.parse.quote(search_query)
       url = f'https://lrclib.net/api/search?q={encoded_query}'
