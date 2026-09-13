@@ -39,7 +39,7 @@ intents.voice_states = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Cấu hình yt-dlp dùng scsearch (SoundCloud) để an toàn tuyệt đối
+# Cấu hình yt-dlp dùng scsearch (SoundCloud) để phát nhạc an toàn tuyệt đối
 ytdl_format_options = {
     'format': 'bestaudio/best',
     'noplaylist': True,
@@ -120,11 +120,20 @@ async def play(ctx, *, search: str):
   async with ctx.typing():
     loop = asyncio.get_event_loop()
     try:
+      # Nếu người dùng dán link YouTube, tự động chuyển sang tìm kiếm tên hoặc SoundCloud để không bị lỗi chặn bot
+      if 'youtube.com' in search or 'youtu.be' in search:
+        # Thay vì gọi extract_info trực tiếp lên link YouTube gây lỗi, ta dùng default_search scsearch với chính link hoặc chuỗi
+        search = 'scsearch:' + search
+
       data = await loop.run_in_executor(
           None, lambda: ytdl.extract_info(search, download=False)
       )
     except Exception as e:
-      await ctx.send(f'⚠️ Không thể tải bài hát này: {e}')
+      await ctx.send(
+          '⚠️ Không thể phát từ link này do YouTube chặn bot. Bạn hãy gõ tên bài'
+            ' hát trực tiếp nhé (Ví dụ: `!phat Madihu`): '
+          + str(e)
+      )
       return
 
     if 'entries' in data:
@@ -201,34 +210,33 @@ async def lyrics(ctx, *, query: str = None):
     else:
       await ctx.send(
           '⚠️ Bot không phát bài nào cả! Hãy gõ tên bài, tên ca sĩ hoặc từ khóa'
-          ' nhé (Ví dụ: `!loi Em của ngày hôm qua`)'
+          ' nhé (Ví dụ: `!loi Madihu`)'
       )
       return
 
   async with ctx.typing():
     try:
       search_query = query
-      # Nếu người dùng dán link vào, ta tránh gọi yt-dlp trực tiếp lên link YouTube để không bị chặn bot
-      if query.startswith('http://') or query.startswith('https://'):
-        if 'youtube.com' in query or 'youtu.be' in query:
-          # Thay vì ép yt-dlp đọc link YouTube trực tiếp gây lỗi chặn, ta nhắc người dùng nhập tên bài hát hoặc tìm qua SoundCloud
-          await ctx.send(
-              '⚠️ Do YouTube chặn bot đọc trực tiếp từ link, bạn hãy dán link'
-              ' SoundCloud hoặc đơn giản là **gõ tên bài hát/ca sĩ** (Ví dụ:'
-              ' `!loi Madihu Có em chờ`) để tìm lời chính xác nhất nhé!'
-          )
-          return
-        else:
-          # Nếu là link khác (như SoundCloud), cho phép yt-dlp trích xuất bình thường
-          loop = asyncio.get_event_loop()
+      # Nếu dán link YouTube vào lệnh loi, ta chỉ lấy phần text hoặc bỏ qua trích xuất link để tìm kiếm lời qua API lrclib luôn
+      if 'youtube.com' in query or 'youtu.be' in query:
+        search_query = (
+            current_songs.get(guild_id, {}).get('title', '')
+            if guild_id in current_songs
+            else 'Remix'
+        )
+      elif query.startswith('http://') or query.startswith('https://'):
+        loop = asyncio.get_event_loop()
+        try:
           data = await loop.run_in_executor(
               None, lambda: ytdl.extract_info(query, download=False)
           )
           if 'entries' in data:
             data = data['entries'][0]
           search_query = data.get('title', query)
+        except:
+          search_query = query
 
-      # Tiến hành gọi API tìm kiếm lời bài hát lrclib
+      # Tìm kiếm lời bài hát qua API lrclib
       encoded_query = urllib.parse.quote(search_query)
       url = f'https://lrclib.net/api/search?q={encoded_query}'
       req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -284,7 +292,7 @@ token = os.getenv('DISCORD_TOKEN')
 
 if not token:
   print(
-      '⚠️ LỖI CHƯA CÓ TOKEN: Bạn hãy tạo biến DISCORD_TOKEN trong phần'
+      '⚠️ LỖI CHƯA CƠ TOKEN: Bạn hãy tạo biến DISCORD_TOKEN trong phần'
       ' Environment của Render nhé!'
   )
 else:
