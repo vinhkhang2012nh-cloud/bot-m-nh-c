@@ -46,18 +46,21 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 # ==========================================
 # 3. CẤU HÌNH YT-DLP VÀ FFMPEG
 # ==========================================
-
 ytdl_format_options = {
     'format': 'bestaudio',
     'noplaylist': True,
-    'default_search': 'auto',
+    'default_search': (
+        'scsearch'  # Ép toàn bộ tìm kiếm từ khóa chạy qua SoundCloud
+    ),
     'quiet': True,
 }
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
 ffmpeg_options = {
-    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+    'before_options': (
+        '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
+    ),
     'options': '-vn',
 }
 # ==========================================
