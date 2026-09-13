@@ -39,7 +39,7 @@ intents.voice_states = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Chuyển hoàn toàn default_search sang 'scsearch' (SoundCloud) để tránh bị YouTube chặn bot
+# Cấu hình yt-dlp dùng scsearch (SoundCloud) để an toàn tuyệt đối
 ytdl_format_options = {
     'format': 'bestaudio/best',
     'noplaylist': True,
@@ -67,7 +67,6 @@ current_songs = {}
 def play_next(ctx):
   guild_id = ctx.guild.id
 
-  # Kiểm tra nếu bật chế độ lặp lại bài hiện tại
   if (
       guild_id in music_loops
       and music_loops[guild_id]
@@ -75,11 +74,9 @@ def play_next(ctx):
   ):
     song = current_songs[guild_id]
   elif guild_id in music_queues and len(music_queues[guild_id]) > 0:
-    # Lấy bài tiếp theo trong hàng đợi
     song = music_queues[guild_id].pop(0)
     current_songs[guild_id] = song
   else:
-    # Hết hàng đợi và không lặp -> Chờ một lúc rồi rời phòng
     asyncio.run_coroutine_threadsafe(discon(ctx), bot.loop)
     return
 
@@ -100,7 +97,7 @@ async def play_next_async(ctx):
 
 
 async def discon(ctx):
-  await asyncio.sleep(60)  # Đợi 1 phút nếu không có ai gọi thì out voice
+  await asyncio.sleep(60)
   if ctx.voice_client and not ctx.voice_client.is_playing():
     await ctx.voice_client.disconnect()
 
@@ -136,7 +133,6 @@ async def play(ctx, *, search: str):
     song = {'title': data['title'], 'url': data['url']}
     guild_id = ctx.guild.id
 
-    # Nếu bot đang bận phát nhạc bài khác -> Cho vào hàng đợi
     if ctx.voice_client.is_playing():
       if guild_id not in music_queues:
         music_queues[guild_id] = []
@@ -146,7 +142,6 @@ async def play(ctx, *, search: str):
           f' {len(music_queues[guild_id])})'
       )
     else:
-      # Nếu bot đang rảnh -> Phát luôn
       current_songs[guild_id] = song
       player = discord.FFmpegPCMAudio(song['url'], **ffmpeg_options)
       ctx.voice_client.play(
@@ -205,25 +200,35 @@ async def lyrics(ctx, *, query: str = None):
       query = current_songs[guild_id]['title']
     else:
       await ctx.send(
-          '⚠️ Bot không phát bài nào cả! Hãy gõ tên bài, tên ca sĩ hoặc dán link'
-          ' vào nhé (Ví dụ: `!loi Em của ngày hôm qua`)'
+          '⚠️ Bot không phát bài nào cả! Hãy gõ tên bài, tên ca sĩ hoặc từ khóa'
+          ' nhé (Ví dụ: `!loi Em của ngày hôm qua`)'
       )
       return
 
   async with ctx.typing():
     try:
       search_query = query
-      # Nếu người dùng dán link vào
+      # Nếu người dùng dán link vào, ta tránh gọi yt-dlp trực tiếp lên link YouTube để không bị chặn bot
       if query.startswith('http://') or query.startswith('https://'):
-        loop = asyncio.get_event_loop()
-        data = await loop.run_in_executor(
-            None, lambda: ytdl.extract_info(query, download=False)
-        )
-        if 'entries' in data:
-          data = data['entries'][0]
-        search_query = data.get('title', query)
+        if 'youtube.com' in query or 'youtu.be' in query:
+          # Thay vì ép yt-dlp đọc link YouTube trực tiếp gây lỗi chặn, ta nhắc người dùng nhập tên bài hát hoặc tìm qua SoundCloud
+          await ctx.send(
+              '⚠️ Do YouTube chặn bot đọc trực tiếp từ link, bạn hãy dán link'
+              ' SoundCloud hoặc đơn giản là **gõ tên bài hát/ca sĩ** (Ví dụ:'
+              ' `!loi Madihu Có em chờ`) để tìm lời chính xác nhất nhé!'
+          )
+          return
+        else:
+          # Nếu là link khác (như SoundCloud), cho phép yt-dlp trích xuất bình thường
+          loop = asyncio.get_event_loop()
+          data = await loop.run_in_executor(
+              None, lambda: ytdl.extract_info(query, download=False)
+          )
+          if 'entries' in data:
+            data = data['entries'][0]
+          search_query = data.get('title', query)
 
-      # Tìm kiếm lời bài hát qua API lrclib
+      # Tiến hành gọi API tìm kiếm lời bài hát lrclib
       encoded_query = urllib.parse.quote(search_query)
       url = f'https://lrclib.net/api/search?q={encoded_query}'
       req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
